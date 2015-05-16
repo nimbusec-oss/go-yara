@@ -9,13 +9,10 @@ package yara
 #include <yara.h>
 
 int rules_callback(int message, void *message_data, void *user_data);
-size_t stream_read(void* ptr, size_t size, size_t nmemb, void* user_data);
-size_t stream_write(void* ptr, size_t size, size_t nmemb, void* user_data);
 */
 import "C"
 import (
 	"errors"
-	"io"
 	"runtime"
 	"time"
 	"unsafe"
@@ -131,19 +128,6 @@ func (r *Rules) ScanMem(buf []byte, flags ScanFlags, timeout time.Duration) (mat
 	return
 }
 
-// ScanFileDescriptor scans a file using the ruleset.
-func (r *Rules) ScanFileDescriptor(fd uintptr, flags ScanFlags, timeout time.Duration) (matches []MatchRule, err error) {
-	dummy = &matches
-	err = newError(C.yr_rules_scan_fd(
-		r.cptr,
-		C.YR_FILE_DESCRIPTOR(fd),
-		C.int(flags),
-		C.YR_CALLBACK_FUNC(C.rules_callback),
-		unsafe.Pointer(&matches),
-		C.int(timeout/time.Second)))
-	return
-}
-
 // ScanFile scans a file using the ruleset.
 func (r *Rules) ScanFile(filename string, flags ScanFlags, timeout time.Duration) (matches []MatchRule, err error) {
 	cfilename := C.CString(filename)
@@ -180,35 +164,12 @@ func (r *Rules) Save(filename string) (err error) {
 	return
 }
 
-// Write writes a compiled ruleset to an io.Writer.
-func (r *Rules) Write(wr io.Writer) (err error) {
-	var stream C.YR_STREAM
-	stream.user_data = unsafe.Pointer(&wr)
-	stream.write = C.YR_STREAM_WRITE_FUNC(C.stream_write)
-	err = newError(C.yr_rules_save_stream(r.cptr, &stream))
-	return
-}
-
 // LoadRules retrieves a compiled ruleset from filename.
 func LoadRules(filename string) (*Rules, error) {
 	var yrRules *C.YR_RULES
 	cfilename := C.CString(filename)
 	defer C.free(unsafe.Pointer(cfilename))
 	if err := newError(C.yr_rules_load(cfilename, &yrRules)); err != nil {
-		return nil, err
-	}
-	r := &Rules{rules: &rules{cptr: yrRules}}
-	runtime.SetFinalizer(r.rules, (*rules).finalize)
-	return r, nil
-}
-
-// ReadRules retrieves a compiled ruleset from an io.Reader
-func ReadRules(rd io.Reader) (*Rules, error) {
-	var yrRules *C.YR_RULES
-	var stream C.YR_STREAM
-	stream.user_data = unsafe.Pointer(&rd)
-	stream.read = C.YR_STREAM_READ_FUNC(C.stream_read)
-	if err := newError(C.yr_rules_load_stream(&stream, &yrRules)); err != nil {
 		return nil, err
 	}
 	r := &Rules{rules: &rules{cptr: yrRules}}
