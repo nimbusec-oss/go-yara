@@ -109,7 +109,10 @@ func TestReader(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ReadRules: %+v", err)
 	}
-	m, err := r.ScanMem([]byte(" abc "), 0, 0)
+
+	buf := &bytes.Buffer{}
+	buf.Write([]byte(" abc "))
+	m, err := r.ScanMem(buf.Bytes(), 0, 0)
 	if err != nil {
 		t.Errorf("ScanMem: %s", err)
 	}

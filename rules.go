@@ -135,7 +135,8 @@ const (
 func (r *Rules) ScanMem(buf []byte, flags ScanFlags, timeout time.Duration) (matches []MatchRule, err error) {
 	var ptr *C.uint8_t
 	if len(buf) > 0 {
-		ptr = (*C.uint8_t)(unsafe.Pointer(&(buf[0])))
+		ptr = (*C.uint8_t)(unsafe.Pointer(C.CString(string(buf))))
+		defer C.free(unsafe.Pointer(ptr))
 	}
 	id := callbackData.Put(&matches)
 	defer callbackData.Delete(id)
