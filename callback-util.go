@@ -3,7 +3,6 @@ package yara
 import (
 	"strconv"
 	"sync"
-	"unsafe"
 )
 
 /*
@@ -16,47 +15,41 @@ Concurrent access to the stored data is protected through a
 sync.RWMutex.
 */
 type closure struct {
-	m map[uintptr]interface{}
+	m map[int]interface{}
 	sync.RWMutex
 }
 
-func (c *closure) Put(elem interface{}) unsafe.Pointer {
+func (c *closure) Put(elem interface{}) *int {
 	c.Lock()
 	if c.m == nil {
-		c.m = make(map[uintptr]interface{})
+		c.m = make(map[int]interface{})
 	}
 	defer c.Unlock()
-
-	var i uintptr
-	for i = 0; ; i++ {
+	for i := 0; ; i++ {
 		_, ok := c.m[i]
 		if !ok {
 			c.m[i] = elem
-			return unsafe.Pointer(i)
+			return &i
 		}
 	}
 }
 
-func (c *closure) Get(ptr unsafe.Pointer) interface{} {
+func (c *closure) Get(id *int) interface{} {
 	c.RLock()
 	defer c.RUnlock()
-
-	id := uintptr(ptr)
-	if r, ok := c.m[id]; ok {
+	if r, ok := c.m[*id]; ok {
 		return r
 	}
-	panic("get: element " + strconv.Itoa(int(id)) + " not found")
+	panic("get: element " + strconv.Itoa(*id) + " not found")
 }
 
-func (c *closure) Delete(ptr unsafe.Pointer) {
+func (c *closure) Delete(id *int) {
 	c.Lock()
 	defer c.Unlock()
-
-	id := uintptr(ptr)
-	if _, ok := c.m[id]; !ok {
-		panic("delete: element " + strconv.Itoa(int(id)) + " not found")
+	if _, ok := c.m[*id]; !ok {
+		panic("delete: element " + strconv.Itoa(*id) + " not found")
 	}
-	delete(c.m, id)
+	delete(c.m, *id)
 }
 
 var callbackData closure
